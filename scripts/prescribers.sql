@@ -7,18 +7,22 @@ LEFT JOIN prescription p2
 USING (npi)
 WHERE total_claim_count IS NOT NULL
 GROUP BY p1.npi
-ORDER BY total_claim_count DESC;
+ORDER BY total_claim_count DESC
+LIMIT 20;
+
+--ANSWER:prescriber w/ npi#: 1881634483	w/ a total of 99707 claims
     
 --     b. Repeat the above, but this time report the nppes_provider_first_name, nppes_provider_last_org_name,  specialty_description, and the total number of claims.
 
-SELECT npi, nppes_provider_first_name, nppes_provider_last_org_name, p1.specialty_description, SUM(total_claim_count) AS total_claim_count
-FROM prescriber p1
-LEFT JOIN prescription p2
+SELECT p1.npi, p1.nppes_provider_first_name, p1.nppes_provider_last_org_name,    							p1.specialty_description, SUM(p2.total_claim_count) AS total_claims
+FROM prescriber AS p1
+LEFT JOIN prescription AS p2
 USING (npi)
-WHERE total_claim_count IS NOT NULL
-GROUP BY npi, nppes_provider_first_name, nppes_provider_last_org_name, specialty_description,
-ORDER BY SUM(total_claim_count) DESC;
----bruce pennly
+WHERE p2.total_claim_count IS NOT NULL
+GROUP BY p1.npi, p1.nppes_provider_first_name, 																p1.nppes_provider_last_org_name,p1.specialty_description
+ORDER BY SUM(p2.total_claim_count) DESC;	
+
+--ANSWER: Bruce Pendley (Family Practice)
 
 -- 2. 
 --     a. Which specialty had the most total number of claims (totaled over all drugs)?
@@ -30,6 +34,8 @@ USING (npi)
 WHERE total_claim_count IS NOT NULL
 GROUP BY specialty_description
 ORDER BY sum_of_claim_count DESC;
+
+--ANSWER: Family Practice
 
 --     b. Which specialty had the most total number of claims for opioids?
 -- SELECT *
@@ -44,34 +50,63 @@ WHERE opioid_drug_flag='Y'
 GROUP BY specialty_description
 ORDER BY SUM(total_claim_count) DESC;
 
+--ANSWER: Nurse Practitioner
+
 --     c. **Challenge Question:** Are there any specialties that appear in the prescriber table that have no associated prescriptions in the prescription table?
 
 --     d. **Difficult Bonus:** *Do not attempt until you have solved all other problems!* For each specialty, report the percentage of total claims by that specialty which are for opioids. Which specialties have a high percentage of opioids?
 
 -- 3. 
 --     a. Which drug (generic_name) had the highest total drug cost?
-SELECT generic_name, total_drug_cost
+SELECT generic_name, CAST(total_drug_cost AS money)
 FROM prescription
 LEFT JOIN drug
 USING (drug_name)
 ORDER BY  total_drug_cost DESC
-LIMIT 1;
+LIMIT 50;
 
+--ANSWER: "PIRFENIDONE"	"$2,829,174.30"
 
 --     b. Which drug (generic_name) has the hightest total cost per day? **Bonus: Round your cost per day column to 2 decimal places. Google ROUND to see how this works.**
 
 
+SELECT d.generic_name, CAST(ROUND(SUM(p.total_drug_cost)/SUM(p.total_day_supply),2) AS money) AS cost_per_day
+FROM prescription AS p
+LEFT JOIN drug AS d
+USING (drug_name)
+GROUP BY d.generic_name
+ORDER BY  cost_per_day DESC
+LIMIT 50;
 
---------do i have to account for ge65+ (they pay a different amount, do we average?)
-
+--ANSWER: "C1 ESTERASE INHIBITOR"	$3,495.22
 
 -- 4. 
 --     a. For each drug in the drug table, return the drug name and then a column named 'drug_type' which says 'opioid' for drugs which have opioid_drug_flag = 'Y', says 'antibiotic' for those drugs which have antibiotic_drug_flag = 'Y', and says 'neither' for all other drugs.
 
+SELECT drug_name,
+		CASE WHEN opioid_drug_flag ='Y' THEN 'opioid'
+				WHEN antibiotic_drug_flag ='Y' THEN 'antibiotic'
+				ELSE 'neither' END AS drug_type
+FROM drug;
+
+
+
 --     b. Building off of the query you wrote for part a, determine whether more was spent (total_drug_cost) on opioids or on antibiotics. Hint: Format the total costs as MONEY for easier comparision.
 
+FROM drug AS d
+         (SELECT drug_name, SUM(total_drug_cost),
+		CASE WHEN opioid_drug_flag ='Y' THEN 'opioid'
+				WHEN antibiotic_drug_flag ='Y' THEN 'antibiotic'
+				ELSE 'neither' END) AS drug_type
+INNER JOIN prescription AS p
+USING (drug_name)
+WHERE drug_type IN ('antibiotic','opioid')
+GROUP BY drug_type;
+---Will come back
 -- 5. 
 --     a. How many CBSAs are in Tennessee? **Warning:** The cbsa table contains information for all states, not just Tennessee.
+SELECT*
+FROM cbsa
 
 --     b. Which cbsa has the largest combined population? Which has the smallest? Report the CBSA name and total population.
 
