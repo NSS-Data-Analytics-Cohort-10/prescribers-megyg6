@@ -164,43 +164,91 @@ ORDER BY p.population DESC;
 --     a. Find all rows in the prescription table where total_claims is at least 3000. Report the drug_name and the total_claim_count.
 
 
-
+--the following is my original code/thought process:
 SELECT drug_name, SUM(total_claim_count) AS sum_of_claims
 FROM prescription
 GROUP BY npi, drug_name
 HAVING SUM(total_claim_count)>=3000
 ORDER BY sum_of_claims DESC;
+--my original thought was to do a summation on total_claim_count bc I thought that the total was not definite when grouped by npi, but there is a duplicate and the more I look at it, it looks inacurate. The code above returns 9 rows with oxycodone hcl having more claims.
+
+-- Following code was shared with me by classmate:
+--SELECT drug_name, SUM(total_claim_count) AS sum_of_claims
+-- FROM prescription
+-- WHERE total_claim_count>=3000
+-- GROUP BY drug_name
+-- ORDER BY sum_of_claims DESC; 
+SELECT drug_name, SUM(total_claim_count) AS sum_of_claims
+FROM prescription
+WHERE total_claim_count>=3000
+GROUP BY drug_name
+ORDER BY sum_of_claims DESC;
+--THIS GIVES 7 rows with "LEVOTHYROXINE SODIUM" having the most claims at 9262
+
+
+
 
 
 --     b. For each instance that you found in part a, add a column that indicates whether the drug is an opioid.
 
 
-SELECT p.drug_name, total_claim_count,
-	CASE WHEN d.opioid_drug_flag= 'Y' THEN 'Y'
-	ELSE 'N' END AS opioid
-FROM prescription AS p
-LEFT JOIN drug AS d
-USING (drug_name)
-GROUP BY p.npi, p.drug_name, p.total_claim_count,d.opioid_drug_flag
-HAVING SUM(p.total_claim_count)>=3000
-ORDER BY p.total_claim_count DESC
-LIMIT 9;
 
+-- --the following was my initial thought process when using having previously
+-- SELECT p.drug_name, total_claim_count,
+-- 	CASE WHEN d.opioid_drug_flag= 'Y' THEN 'Y'
+-- 	ELSE 'N' END AS opioid
+-- FROM prescription AS p
+-- LEFT JOIN drug AS d
+-- USING (drug_name)
+-- GROUP BY p.npi, p.drug_name, p.total_claim_count,d.opioid_drug_flag
+-- HAVING SUM(p.total_claim_count)>=3000
+-- ORDER BY p.total_claim_count DESC
+-- LIMIT 9;
+
+
+--after help on part a, these are my adjustments for part b:
+SELECT drug_name, SUM(total_claim_count) AS sum_of_claims,
+	CASE WHEN d.opioid_drug_flag= 'Y' THEN 'opioid'
+	ELSE 'N' END AS opioid_flag
+FROM drug AS d
+LEFT JOIN prescription AS p
+USING (drug_name)
+WHERE total_claim_count>=3000
+GROUP BY d.drug_name, d.opioid_drug_flag
+ORDER BY sum_of_claims DESC;
+--ANSWER: "OXYCODONE HCL" with claims of 4538 and "HYDROCODONE-ACETAMINOPHEN" with claims of 3376 are the only two opioids on the list
 
 --     c. Add another column to you answer from the previous part which gives the prescriber first and last name associated with each row.
 
-SELECT p2.nppes_provider_last_org_name,p2.nppes_provider_first_name, p.drug_name, total_claim_count,
-	CASE WHEN d.opioid_drug_flag= 'Y' THEN 'Y'
-	ELSE 'N' END AS opioid
-FROM prescription AS p
-LEFT JOIN drug AS d
+---the following was my original thought process when using having function in part a
+-- SELECT p2.nppes_provider_last_org_name,p2.nppes_provider_first_name, p.drug_name, total_claim_count,
+-- 	CASE WHEN d.opioid_drug_flag= 'Y' THEN 'Y'
+-- 	ELSE 'N' END AS opioid
+-- FROM prescription AS p
+-- LEFT JOIN drug AS d
+-- USING (drug_name)
+-- LEFT JOIN prescriber AS p2
+-- ON p.npi=p2.npi
+-- GROUP BY p.npi, p.drug_name, p.total_claim_count,d.opioid_drug_flag,p2.nppes_provider_last_org_name,p2.nppes_provider_first_name
+-- HAVING SUM(p.total_claim_count)>=3000
+-- ORDER BY p.total_claim_count DESC
+-- LIMIT 9;
+SELECT nppes_provider_first_name, nppes_provider_last_org_name, drug_name, SUM(total_claim_count) AS sum_of_claims,
+	CASE WHEN d.opioid_drug_flag= 'Y' THEN 'opioid'
+	ELSE 'N' END AS opioid_flag
+FROM drug AS d
+LEFT JOIN prescription AS p
 USING (drug_name)
 LEFT JOIN prescriber AS p2
-ON p.npi=p2.npi
-GROUP BY p.npi, p.drug_name, p.total_claim_count,d.opioid_drug_flag,p2.nppes_provider_last_org_name,p2.nppes_provider_first_name
-HAVING SUM(p.total_claim_count)>=3000
-ORDER BY p.total_claim_count DESC
-LIMIT 9;
+ON p.npi = p2.npi
+WHERE total_claim_count>=3000
+GROUP BY d.drug_name, d.opioid_drug_flag, nppes_provider_last_org_name, nppes_provider_first_name 
+ORDER BY sum_of_claims DESC;
+
+--ANSWER: first row "DAVID"	"COFFEY" ,"OXYCODONE HCL",	4538,	"opioid"
+
+
+
 
 -- 7. The goal of this exercise is to generate a full list of all pain management specialists in Nashville and the number of claims they had for each opioid. **Hint:** The results from all 3 parts will have 637 rows.
 
@@ -216,32 +264,26 @@ WHERE p.specialty_description = 'Pain Management'
 
 --     b. Next, report the number of claims per drug per prescriber. Be sure to include all combinations, whether or not the prescriber had any claims. You should report the npi, the drug name, and the number of claims (total_claim_count).
 
+
 SELECT p.npi, d.drug_name, p2.total_claim_count
 FROM prescriber AS p
 CROSS JOIN drug AS d
 LEFT JOIN prescription AS p2
-ON p.npi=p2.total_claim_count
+ON p.npi=p2.npi
+ AND d.drug_name=p2.drug_name
 WHERE p.specialty_description = 'Pain Management'
 	AND p.nppes_provider_city = 'NASHVILLE'
 	AND d.opioid_drug_flag = 'Y';
-	
-SELECT p1.npi, p2.total_claim_count, d.drug_name
-FROM prescriber p1
-LEFT JOIN prescription p2
-USING (npi)
-CROSS JOIN drug AS d
-WHERE p1.specialty_description = 'Pain Management'
-	AND p1.nppes_provider_city = 'NASHVILLE'
-	AND d.opioid_drug_flag = 'Y';
-	
 
-
---clues 1 all about the 1st sentence, not a concept not talked about in class, and has to do with keys
----cross join? 
----key 
---left join prescription but the key being used is throwing ppl off 
---no aggregation
- --using 2 keys?
- 
  
 --     c. Finally, if you have not done so already, fill in any missing values for total_claim_count with 0. Hint - Google the COALESCE function.
+
+SELECT p.npi, d.drug_name, COALESCE (p2.total_claim_count,0)
+FROM prescriber AS p
+CROSS JOIN drug AS d
+LEFT JOIN prescription AS p2
+ON p.npi=p2.npi
+ AND d.drug_name=p2.drug_name
+WHERE p.specialty_description = 'Pain Management'
+	AND p.nppes_provider_city = 'NASHVILLE'
+	AND d.opioid_drug_flag = 'Y';
